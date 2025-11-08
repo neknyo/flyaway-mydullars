@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useRef } from 'react';
-import { Coins, Calendar, DollarSign, CheckSquare, Moon, Sun, Eye, EyeOff, MousePointer2, Car, Utensils, Receipt, Gamepad2, Eraser, ArrowRightLeft, Download, Upload, Plus } from 'lucide-react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Coins, Calendar, DollarSign, CheckSquare, Moon, Sun, Eye, EyeOff, MousePointer2, Car, Utensils, Receipt, Gamepad2, Eraser, ArrowRightLeft, Download, Upload, Plus, Trash2 } from 'lucide-react';
 
 // ----------
 // dese are da ways u loose money. sad times.
@@ -12,49 +12,67 @@ const WAYS_I_LOST_MONEY = {
 };
 
 const EXCHANGE_RATE = 15500; // 1 freedombuck = 15500 rupiahs
+const STORAGE_KEY = 'mydullars_super_important_data';
 
 const MoneyTrackerScrollable = () => {
   // ----------
-  // da settings for how it luks
+  // setup initial state (try 2 load from browser memory first)
   // ----------
-  const [moneyFlavor, setMoneyFlavor] = useState('IDR');
-  const [imBlindMode, setImBlindMode] = useState(false);
-  const [lemmeSeeColors, setLemmeSeeColors] = useState(true);
-  // activeSplat: null = type numbies mode, string = splat color mode
-  const [activeSplat, setActiveSplat] = useState(null); 
-  const fileInputRef = useRef(null);
+  const loadSavedStuff = () => {
+      try {
+          const saved = localStorage.getItem(STORAGE_KEY);
+          if (saved) {
+              const parsed = JSON.parse(saved);
+              // we gotta turn the pickedRows back into a 'Set' cuz JSON doesn't know what a Set is
+              return { ...parsed, pickedRows: new Set(parsed.pickedRows) };
+          }
+      } catch (e) {
+          console.error("oh no, save data corrupted :(", e);
+      }
+      return null;
+  };
 
-  // ----------
-  // da big list of boxes data
-  // ----------
   const numCols = 8;
-
   const makeEmptyBoxes = () => {
     const rows = [];
-    // start with 50 rows
     for (let i = 1; i <= 50; i++) {
       const cells = {};
-      for (let j = 1; j <= numCols; j++) {
-        cells[`slot${j}`] = {
-          value: 0,
-          type: null
-        };
-      }
-      rows.push({
-        id: i,
-        date: `2023-10-${(i % 31 || 31).toString().padStart(2, '0')}`, // roughly valid dates
-        cells: cells
-      });
+      for (let j = 1; j <= numCols; j++) cells[`slot${j}`] = { value: 0, type: null };
+      rows.push({ id: i, date: `2023-10-${(i % 31 || 31).toString().padStart(2, '0')}`, cells: cells });
     }
     return rows;
   };
 
-  const [stuffInTheBoxes, setStuffInTheBoxes] = useState(() => makeEmptyBoxes());
-  const [pickedRows, setPickedRows] = useState(new Set());
+  // load it up!
+  const savedData = useMemo(() => loadSavedStuff(), []);
+
+  // ----------
+  // da settings & data state
+  // ----------
+  const [moneyFlavor, setMoneyFlavor] = useState(savedData?.moneyFlavor || 'IDR');
+  const [imBlindMode, setImBlindMode] = useState(savedData?.imBlindMode || false);
+  const [lemmeSeeColors, setLemmeSeeColors] = useState(savedData?.lemmeSeeColors ?? true);
+  const [stuffInTheBoxes, setStuffInTheBoxes] = useState(savedData?.stuffInTheBoxes || makeEmptyBoxes());
+  const [pickedRows, setPickedRows] = useState(savedData?.pickedRows || new Set());
   
-  // tracking what we are editing right now
-  const [boxImTypingIn, setBoxImTypingIn] = useState(null); // { rowId, slotKey }
-  const [dateImTypingIn, setDateImTypingIn] = useState(null); // rowId
+  const [activeSplat, setActiveSplat] = useState(null); 
+  const fileInputRef = useRef(null);
+  const [boxImTypingIn, setBoxImTypingIn] = useState(null);
+  const [dateImTypingIn, setDateImTypingIn] = useState(null);
+
+  // ----------
+  // AUTO-SAVE MAGIC (runs every time something changes)
+  // ----------
+  useEffect(() => {
+      const dataToSave = {
+          moneyFlavor,
+          imBlindMode,
+          lemmeSeeColors,
+          stuffInTheBoxes,
+          pickedRows: Array.from(pickedRows) // turn Set into Array for JSON
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+  }, [moneyFlavor, imBlindMode, lemmeSeeColors, stuffInTheBoxes, pickedRows]);
 
   // ----------
   // math time. brain hurts.
@@ -89,7 +107,6 @@ const MoneyTrackerScrollable = () => {
 
   const pokeBox = (rowId, slotKey) => {
     if (activeSplat !== null) {
-      // Splat Mode: paint da box
       setStuffInTheBoxes(prevData => prevData.map(row => {
         if (row.id === rowId) {
            const newType = activeSplat === 'eraser' ? null : activeSplat;
@@ -98,82 +115,50 @@ const MoneyTrackerScrollable = () => {
         return row;
       }));
     } else {
-      // Type Mode: let me type numbies
       setBoxImTypingIn({ rowId, slotKey });
     }
   };
 
   const changeBoxNumber = (e, rowId, slotKey) => {
     let newValue = parseFloat(e.target.value) || 0;
-    
-    // if we typing in USD, we gotta convert back to IDR for storage
-    // so da math stays consistent
-    if (moneyFlavor === 'USD') {
-        newValue = newValue * EXCHANGE_RATE;
-    }
-
+    if (moneyFlavor === 'USD') newValue = newValue * EXCHANGE_RATE;
     setStuffInTheBoxes(prevData => prevData.map(row => {
-      if (row.id === rowId) {
-        return { ...row, cells: { ...row.cells, [slotKey]: { ...row.cells[slotKey], value: newValue } } };
-      }
+      if (row.id === rowId) return { ...row, cells: { ...row.cells, [slotKey]: { ...row.cells[slotKey], value: newValue } } };
       return row;
     }));
   };
 
   const changeDate = (e, rowId) => {
       const newDate = e.target.value;
-      setStuffInTheBoxes(prevData => prevData.map(row => {
-          if (row.id === rowId) {
-              return { ...row, date: newDate };
-          }
-          return row;
-      }));
+      setStuffInTheBoxes(prevData => prevData.map(row => (row.id === rowId ? { ...row, date: newDate } : row)));
   };
 
   const addDaRow = () => {
       setStuffInTheBoxes(prev => {
-          // find da biggest ID so far and add 1
           const maxId = prev.reduce((max, row) => Math.max(max, row.id), 0);
-          const newId = maxId + 1;
-          
           const cells = {};
-          for (let j = 1; j <= numCols; j++) {
-              cells[`slot${j}`] = { value: 0, type: null };
-          }
-
-          // today's date for new row
-          const today = new Date().toISOString().split('T')[0];
-
-          return [...prev, {
-              id: newId,
-              date: today,
-              cells: cells
-          }];
+          for (let j = 1; j <= numCols; j++) cells[`slot${j}`] = { value: 0, type: null };
+          return [...prev, { id: maxId + 1, date: new Date().toISOString().split('T')[0], cells: cells }];
       });
-      // scroll to bottom magically happens cuz react renders it
   };
 
-  const stopTyping = () => {
-    setBoxImTypingIn(null);
-    setDateImTypingIn(null);
-  };
+  const nukeEverything = () => {
+      if (window.confirm("ARE U SURE?? THIS DELETES EVERYTHING!")) {
+          localStorage.removeItem(STORAGE_KEY);
+          window.location.reload();
+      }
+  }
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      stopTyping();
-    }
-  };
+  const stopTyping = () => { setBoxImTypingIn(null); setDateImTypingIn(null); };
+  const handleKeyDown = (e) => { if (e.key === 'Enter') stopTyping(); };
 
   // ----------
   // csv magic stuff here
   // ----------
   const saveTheLog = () => {
     let csvContent = "data:text/csv;charset=utf-8,Date";
-    for (let j = 1; j <= numCols; j++) {
-        csvContent += `,Slot ${j} Value (IDR),Slot ${j} Type`;
-    }
+    for (let j = 1; j <= numCols; j++) csvContent += `,Slot ${j} Value (IDR),Slot ${j} Type`;
     csvContent += "\n";
-
     stuffInTheBoxes.forEach(row => {
         let rowString = `${row.date}`;
         for (let j = 1; j <= numCols; j++) {
@@ -182,7 +167,6 @@ const MoneyTrackerScrollable = () => {
         }
         csvContent += rowString + "\n";
     });
-
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -195,27 +179,20 @@ const MoneyTrackerScrollable = () => {
   const loadTheLog = (event) => {
     const file = event.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (e) => {
         const text = e.target.result;
         const lines = text.split('\n');
         const newStuff = [];
-        // start loop at 1 to skip header
         for (let i = 1; i < lines.length; i++) {
             if (!lines[i].trim()) continue;
             const cols = lines[i].split(',');
-            const date = cols[0];
             const cells = {};
             for (let j = 1; j <= numCols; j++) {
                 const valIndex = 1 + (j - 1) * 2;
-                const typeIndex = valIndex + 1;
-                cells[`slot${j}`] = {
-                    value: parseFloat(cols[valIndex]) || 0,
-                    type: cols[typeIndex] || null
-                };
+                cells[`slot${j}`] = { value: parseFloat(cols[valIndex]) || 0, type: cols[valIndex + 1] || null };
             }
-            newStuff.push({ id: i, date: date, cells: cells });
+            newStuff.push({ id: i, date: cols[0], cells: cells });
         }
         if (newStuff.length > 0) setStuffInTheBoxes(newStuff);
     };
@@ -228,23 +205,11 @@ const MoneyTrackerScrollable = () => {
   // ----------
   const makeMoneyLookPretty = (val) => {
     const num = parseFloat(val) || 0;
-    if (moneyFlavor === 'USD') {
-      // divide by rate to see real USD value
-      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(num / EXCHANGE_RATE);
-    } else {
-      // IDR is base, just show it
-      return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
-    }
+    if (moneyFlavor === 'USD') return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(num / EXCHANGE_RATE);
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
   };
 
-  // helper for input fields so we don't see 15 decimals when typing
-  const getEditValue = (val) => {
-      if (moneyFlavor === 'USD') {
-          // show reasonably rounded USD when editing
-          return (val / EXCHANGE_RATE).toFixed(2);
-      }
-      return val;
-  }
+  const getEditValue = (val) => moneyFlavor === 'USD' ? (val / EXCHANGE_RATE).toFixed(2) : val;
 
   const getSplatColors = (type) => {
     if (!lemmeSeeColors || !type || !WAYS_I_LOST_MONEY[type]) return imBlindMode ? 'bg-gray-800 text-gray-300' : 'bg-white text-gray-600';
@@ -257,7 +222,6 @@ const MoneyTrackerScrollable = () => {
     };
     return colorMap[colorBase] || (imBlindMode ? 'bg-gray-800' : 'bg-white');
   };
-
 
   // ----------
   // showtime baby
@@ -292,7 +256,7 @@ const MoneyTrackerScrollable = () => {
                     </button>
                 </div>
 
-                {/* csv buttons */}
+                {/* csv & nuke buttons */}
                 <div className="flex items-center gap-2">
                     <button onClick={saveTheLog} className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${imBlindMode ? 'bg-blue-900/30 text-blue-300 hover:bg-blue-900/50' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}>
                         <Download className="w-3.5 h-3.5" /> Save CSV
@@ -301,6 +265,9 @@ const MoneyTrackerScrollable = () => {
                         <Upload className="w-3.5 h-3.5" /> Load CSV
                     </button>
                     <input type="file" ref={fileInputRef} onChange={loadTheLog} accept=".csv" className="hidden" />
+                    <button onClick={nukeEverything} className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ml-2 ${imBlindMode ? 'bg-red-900/30 text-red-400 hover:bg-red-900/50' : 'bg-red-50 text-red-600 hover:bg-red-100'}`} title="RESET APP">
+                        <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                 </div>
             </div>
 
@@ -421,7 +388,7 @@ const MoneyTrackerScrollable = () => {
                                 <input autoFocus type="number" value={getEditValue(cellData.value)} onChange={(e) => changeBoxNumber(e, row.id, slotKey)} onBlur={stopTyping} onKeyDown={handleKeyDown} className={`w-full h-full p-2 text-right font-medium outline-none bg-transparent ${imBlindMode ? 'text-white' : 'text-gray-900'}`}/>
                             ) : (
                                 <div className={`w-full h-full p-3 text-right ${activeSplat === null ? 'cursor-text' : ''}`}>
-                                     {cellData.value == 0 ? <span className="opacity-30">-</span> : makeMoneyLookPretty(cellData.value)}
+                                    {cellData.value == 0 ? <span className="opacity-30">-</span> : makeMoneyLookPretty(cellData.value)}
                                 </div>
                             )}
                         </td>
