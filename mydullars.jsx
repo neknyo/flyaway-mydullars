@@ -1,9 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Coins, Calendar, DollarSign, CheckSquare, Moon, Sun, Eye, EyeOff, MousePointer2, Car, Utensils, Receipt, Gamepad2, Eraser, ArrowRightLeft, Download, Upload, Plus, Trash2 } from 'lucide-react';
 
-// ----------
-// dese are da ways u loose money. sad times.
-// ----------
+// ways for me to lose money
 const WAYS_I_LOST_MONEY = {
   food: { id: 'food', label: 'Food', color: 'red', icon: Utensils },
   transport: { id: 'transport', label: 'Transport', color: 'orange', icon: Car },
@@ -11,19 +9,16 @@ const WAYS_I_LOST_MONEY = {
   entertainment: { id: 'entertainment', label: 'Entertainment', color: 'blue', icon: Gamepad2 },
 };
 
-const EXCHANGE_RATE = 15500; // 1 freedombuck = 15500 rupiahs
+const EXCHANGE_RATE = 15500;
 const STORAGE_KEY = 'mydullars_super_important_data';
 
 const MoneyTrackerScrollable = () => {
-  // ----------
-  // setup initial state (try 2 load from browser memory first)
-  // ----------
+
   const loadSavedStuff = () => {
       try {
           const saved = localStorage.getItem(STORAGE_KEY);
           if (saved) {
               const parsed = JSON.parse(saved);
-              // we gotta turn the pickedRows back into a 'Set' cuz JSON doesn't know what a Set is
               return { ...parsed, pickedRows: new Set(parsed.pickedRows) };
           }
       } catch (e) {
@@ -43,12 +38,12 @@ const MoneyTrackerScrollable = () => {
     return rows;
   };
 
-  // load it up!
+
   const savedData = useMemo(() => loadSavedStuff(), []);
 
-  // ----------
-  // da settings & data state
-  // ----------
+
+  // setitns?
+
   const [moneyFlavor, setMoneyFlavor] = useState(savedData?.moneyFlavor || 'IDR');
   const [imBlindMode, setImBlindMode] = useState(savedData?.imBlindMode || false);
   const [lemmeSeeColors, setLemmeSeeColors] = useState(savedData?.lemmeSeeColors ?? true);
@@ -60,23 +55,21 @@ const MoneyTrackerScrollable = () => {
   const [boxImTypingIn, setBoxImTypingIn] = useState(null);
   const [dateImTypingIn, setDateImTypingIn] = useState(null);
 
-  // ----------
-  // AUTO-SAVE MAGIC (runs every time something changes)
-  // ----------
+
+  // autosave thing
+
   useEffect(() => {
       const dataToSave = {
           moneyFlavor,
           imBlindMode,
           lemmeSeeColors,
           stuffInTheBoxes,
-          pickedRows: Array.from(pickedRows) // turn Set into Array for JSON
+          pickedRows: Array.from(pickedRows) 
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
   }, [moneyFlavor, imBlindMode, lemmeSeeColors, stuffInTheBoxes, pickedRows]);
 
-  // ----------
-  // math time. brain hurts.
-  // ----------
+
   const rowBigNumbers = useMemo(() => {
     const totals = {};
     stuffInTheBoxes.forEach(row => {
@@ -95,9 +88,9 @@ const MoneyTrackerScrollable = () => {
     return total;
   }, [pickedRows, rowBigNumbers]);
 
-  // ----------
-  // clicky things handlers
-  // ----------
+
+  // ok jarvis buatkan skrip jawa
+
   const togglePickedRow = (id) => {
     const newPicked = new Set(pickedRows);
     if (newPicked.has(id)) newPicked.delete(id);
@@ -152,9 +145,8 @@ const MoneyTrackerScrollable = () => {
   const stopTyping = () => { setBoxImTypingIn(null); setDateImTypingIn(null); };
   const handleKeyDown = (e) => { if (e.key === 'Enter') stopTyping(); };
 
-  // ----------
-  // csv magic stuff here
-  // ----------
+  // csv 
+
   const saveTheLog = () => {
     let csvContent = "data:text/csv;charset=utf-8,Date";
     for (let j = 1; j <= numCols; j++) csvContent += `,Slot ${j} Value (IDR),Slot ${j} Type`;
@@ -200,9 +192,8 @@ const MoneyTrackerScrollable = () => {
     event.target.value = null;
   };
 
-  // ----------
-  // helper monkeys
-  // ----------
+
+
   const makeMoneyLookPretty = (val) => {
     const num = parseFloat(val) || 0;
     if (moneyFlavor === 'USD') return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(num / EXCHANGE_RATE);
@@ -223,9 +214,6 @@ const MoneyTrackerScrollable = () => {
     return colorMap[colorBase] || (imBlindMode ? 'bg-gray-800' : 'bg-white');
   };
 
-  // ----------
-  // showtime baby
-  // ----------
   return (
     <div className={`h-screen flex flex-col font-inter transition-colors duration-300 ${imBlindMode ? 'dark bg-gray-900' : 'bg-gray-100'}`}>
       
@@ -234,7 +222,7 @@ const MoneyTrackerScrollable = () => {
         
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-4 w-full md:w-auto flex-wrap">
-                {/* da logo */}
+                {/* logo */}
                 <div className="flex items-center space-x-2 mr-2">
                     <div className={`p-2 rounded-lg ${imBlindMode ? 'bg-emerald-900' : 'bg-emerald-100'}`}>
                     <Coins className={`w-6 h-6 ${imBlindMode ? 'text-emerald-400' : 'text-emerald-600'}`} />
@@ -242,7 +230,7 @@ const MoneyTrackerScrollable = () => {
                     <h1 className={`text-xl font-bold ${imBlindMode ? 'text-white' : 'text-gray-800'}`}>mydullars</h1>
                 </div>
 
-                 {/* buttons for changing stuff */}
+                 {/* for changing stuff */}
                 <div className={`flex items-center space-x-1 p-1 rounded-md border ${imBlindMode ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
                      <button onClick={() => setImBlindMode(!imBlindMode)} className={`p-1.5 rounded transition-colors ${imBlindMode ? 'text-gray-400 hover:bg-gray-700 hover:text-white' : 'text-gray-500 hover:bg-gray-200 hover:text-gray-800'}`} title="Toggle Dark Mode">
                         {imBlindMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -256,7 +244,7 @@ const MoneyTrackerScrollable = () => {
                     </button>
                 </div>
 
-                {/* csv & nuke buttons */}
+                {/*  buttons */}
                 <div className="flex items-center gap-2">
                     <button onClick={saveTheLog} className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${imBlindMode ? 'bg-blue-900/30 text-blue-300 hover:bg-blue-900/50' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}>
                         <Download className="w-3.5 h-3.5" /> Save CSV
@@ -284,7 +272,7 @@ const MoneyTrackerScrollable = () => {
             </div>
         </div>
 
-        {/* splat tools row */}
+        {/* tools row */}
         <div className={`flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 ${!lemmeSeeColors ? 'opacity-50 pointer-events-none' : ''}`}>
             <span className={`text-xs font-semibold uppercase mr-2 ${imBlindMode ? 'text-gray-400' : 'text-gray-500'}`}>Tools:</span>
              <button onClick={() => setActiveSplat(null)} className={`flex items-center space-x-1 px-3 py-1.5 rounded-full border transition-all text-xs font-medium ${activeSplat === null ? (imBlindMode ? 'bg-gray-700 border-gray-500 text-white shadow-sm' : 'bg-white border-gray-400 text-gray-900 shadow-sm') : (imBlindMode ? 'border-transparent text-gray-400 hover:bg-gray-800' : 'border-transparent text-gray-600 hover:bg-gray-200')}`}>
@@ -316,7 +304,7 @@ const MoneyTrackerScrollable = () => {
         </div>
       </div>
 
-      {/* grid area where magic happens */}
+      {/* grid  */}
       <div className={`flex-1 overflow-auto relative ${activeSplat !== null ? 'cursor-crosshair' : ''}`}>
         <table className="min-w-full border-collapse relative">
           <thead className={`${imBlindMode ? 'bg-gray-900' : 'bg-gray-50'} sticky top-0 z-40 shadow-sm`}>
@@ -400,7 +388,7 @@ const MoneyTrackerScrollable = () => {
           </tbody>
         </table>
         
-        {/* da add row button at da bottom */}
+        {/* row button at bottom */}
         <div className="p-4 flex justify-center sticky left-0">
              <button 
                 onClick={addDaRow}
